@@ -1,0 +1,175 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(readxl)
+library(caTools)
+library(caret)
+library(C50)
+library(data.table)
+library(naivebayes)
+library(ModelMetrics)
+library(neuralnet)
+set.seed(12345)
+setwd("~/R/DATA502TennisProject")
+tennisdata <- read.csv('new selection.csv', header=TRUE)
+colnames(tennisdata)[1] <- gsub('^...','',colnames(tennisdata)[1])
+head(tennisdata)
+tennisdata$Gender <- as.factor(tennisdata$Gender)
+tennisdata$Surface <- as.factor(tennisdata$Surface)
+str(tennisdata)
+Y=tennisdata$Result
+```
+
+
+
+```{r}
+#Scaling using Min-Max Normalization
+normalize <- function(x){
+
+x <- as.numeric( as.character( x ))
+
+y <- (x-min(x, na.rm=TRUE))/
+    (max(x, na.rm=TRUE)-min(x, na.rm=TRUE))
+
+
+return(y)
+
+}
+
+MinMaxData <- as.data.frame(lapply(tennisdata, normalize))
+
+
+head(MinMaxData)
+
+MinMaxData$Gender <- tennisdata$Gender
+MinMaxData$Surface <- tennisdata$Surface
+#Splitting Data
+
+sample_data = sample.split(Y=Y, SplitRatio = 0.7) 
+train <- subset(MinMaxData,sample_data == TRUE)
+final.test<- subset(MinMaxData,sample_data == FALSE)
+head(final.test)
+```
+```{r}
+tennis.lm <- lm(Result ~ FSP+FSW+SSP+SSW+ACE+DBF+WNR+UFE+NPA+NPW+ST1+Opp.FSW+Opp.SSP+Opp.SSW+Opp.ACE+Opp.DBF+Opp.WNR+Opp.UFE+Opp.NPA+Opp.NPW
+                +Gender+Surface+Big.Points+CLUTCH., data=train)
+summary(tennis.lm)
+
+#Remove Surface and Gender as it is extremely insignificant and causes problems for the code.*
+```
+
+
+```{r}
+library(neuralnet)
+library(tictoc)
+
+m <- model.matrix( 
+  ~ Result + FSP+FSW+SSP+SSW+ACE+DBF+WNR+UFE+NPA+NPW+ST1+Opp.FSW+Opp.SSP+Opp.SSW+Opp.ACE+Opp.DBF+Opp.WNR+Opp.UFE+Opp.NPA+Opp.NPW+Big.Points+CLUTCH., data = train )
+
+tic()
+nn <- neuralnet(Result ~ FSP+FSW+SSP+SSW+ACE+DBF+WNR+UFE+NPA+NPW+ST1+Opp.FSW+Opp.SSP+Opp.SSW+Opp.ACE+Opp.DBF+Opp.WNR+Opp.UFE+Opp.NPA+Opp.NPW
+                +Big.Points+CLUTCH., data=m,  hidden=c(2,1), stepmax=10E6,linear.output=FALSE, threshold=0.02)
+toc()
+
+plot(nn)
+```
+
+```{r}
+#Prediction Results
+predsubset <- subset(final.test, select = c('FSP','FSW','SSP','SSW','ACE','DBF','WNR','UFE','NPA','NPW','ST1','Opp.FSW','Opp.SSP','Opp.SSW','Opp.ACE','Opp.DBF','Opp.WNR','Opp.UFE','Opp.NPA','Opp.NPW','Big.Points', 'CLUTCH.'))
+
+head(predsubset)
+nn.results <- compute(nn, predsubset)
+results <- data.frame(actual = final.test$Result, prediction = nn.results$net.result)
+results$actual
+```
+
+```{r}
+#Confusion Matrix
+roundedresults<-sapply(results,round,digits=0)
+roundedresultsdf=data.frame(roundedresults)
+attach(roundedresultsdf)
+table(actual,prediction)
+```
+```{r}
+#Accuracy Calculation
+TN <- table(actual,prediction)[1,1]
+TP <- table(actual,prediction)[2,2]
+FN <- table(actual,prediction)[2,1]
+FP <- table(actual,prediction)[1,2]
+TN;TP;FN;FP
+
+accuracy <- (TN+TP)/(TN+TP+FN+FP)
+sensitivity <- TP/(TP+FN)
+specificity <- TN/(TN+FP)
+
+accuracy
+sensitivity
+specificity
+```
+
+```{r}
+library(neuralnet)
+library(devtools)
+source_gist('6206737')
+
+#Garson
+importance <- gar.fun('y', nn)
+importance$data
+
+mini <- min(importance$data[,1])
+max <- max(importance$data[,1])
+#Normalize
+
+RescaledData <- (x-mini)/(max-mini)
+
+importance$data
+
+NewDataScale <- model.extra
+RescaledData$ST1 <- (0.035461781-min(0.035461781))/(max(0.035461781)-min(0.035461781))
+NewDataScale$Opp.FSW <- 
+NewDataScale$FSW <- 
+NewDataScale$UFE <- 
+NewDataScale$ACE
+NewDataScale$WNR
+NewDataScale$Gender
+NewDataScale$Opp.ACE
+NewDataScale$Opp.DBF
+NewDataScale$SSW
+NewDataScale$Opp.SSP
+NewDataScale$Opp.SSW
+NewDataScale$Opp.NPW
+NewDataScale$Opp.UFE
+NewDataScale$Opp.NPA
+NewDataScale$FSP
+NewDataScale$DBF
+NewDataScale$CLUTCH
+NewDataScale$Surface
+NewDataScale$BigPoints
+NewDataScale$NPA
+NewDataScale$NPW
+NewDataScale$SSP
+NewDataScale$Opp.WNR
+
+```
+
+
+```{r}
+roundedresults[,2]
+neuralresults <- data.frame(roundedresults[,2])
+neuralresults
+
+library("writexl")
+write_xlsx(neuralresults,"C:\\Users\\Irene\\Documents\\R\\DATA502TennisProject\\nnPredictions.xlsx")
+```
+
+
