@@ -169,7 +169,7 @@ neuralresults <- data.frame(roundedresults[,2])
 neuralresults
 
 library("writexl")
-write_xlsx(neuralresults,"C:\\Users\\Irene\\Documents\\R\\DATA502TennisProject\\nnPredictions.xlsx")
+write_xlsx(neuralresults,"C:\\Users\\Bryant\\Documents\\R\\DATA502TennisProject\\nnPredictions.xlsx")
 ```
 
 
